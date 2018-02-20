@@ -9,6 +9,14 @@ if CommandLine.arguments.count != 2 {
 } else {
     let sqlFileName = CommandLine.arguments[1]
     let sqlReader = SQLReader(fileName: sqlFileName)
+    sqlReader.read()
 
-    sqlReader.read();
+    if sqlReader.commands.count > 0 {
+        let sqlRunner = SQLRunner()
+        for command in sqlReader.commands {
+            sqlRunner.run(command: command)
+        }
+    } else {
+        print("No commands found in \(sqlFileName)")
+    }
 }

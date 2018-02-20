@@ -2,7 +2,7 @@ import PathKit
 
 class SQLReader {
     let fileName: String
-    var commands: [String]
+    var commands: [Command]
 
     init(fileName: String) {
         self.fileName = fileName
@@ -21,10 +21,11 @@ class SQLReader {
                 let rawLines = fileContents.components(separatedBy: .newlines)
 
                 for line in rawLines {
-                    if line.hasPrefix("--") || line.count == 0 { /* This line is a comment or an empty line */
-
-                    } else {
-                        print(line)
+                    if !line.hasPrefix("--") && line.count != 0 { /* This line is not a comment and not an empty line */
+                        let lineSansSemiColon = line.replacingOccurrences(of: ";", with: "")
+                        if let command = Command(commandString: lineSansSemiColon) {
+                            commands.append(command)
+                        }
                     }
                 }
             } catch {

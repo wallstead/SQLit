@@ -35,6 +35,7 @@ SELECT * FROM tbl_1;
 -- Database db_2 deleted.
 -- !Failed to delete db_2 because it does not exist.
 -- Database db_2 created.
+
 -- Using database db_1.
 -- Table tbl_1 created.
 -- !Failed to create table tbl_1 because it already exists.
