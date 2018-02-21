@@ -4,6 +4,10 @@ import Glibc
 import Darwin.C
 #endif
 
+import PathKit
+
+let startPath = Path.current
+
 if CommandLine.arguments.count != 2 {
     print("Expected sql file as argument.")
 } else {
@@ -12,7 +16,7 @@ if CommandLine.arguments.count != 2 {
     sqlReader.read()
 
     if sqlReader.commands.count > 0 {
-        let sqlRunner = SQLRunner()
+        let sqlRunner = SQLRunner(path: startPath)
         for command in sqlReader.commands {
             sqlRunner.run(command: command)
         }

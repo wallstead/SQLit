@@ -2,10 +2,11 @@ import PathKit
 
 class SQLRunner {
 
-    // init(fileName: String) {
-    //     self.fileName = fileName
-    //     self.commands = []
-    // }
+    let initialPath: Path
+
+    init(path: Path) {
+        self.initialPath = path
+    }
 
     func run(command: Command) { // route to functions
         switch command.baseCommand {
@@ -20,7 +21,7 @@ class SQLRunner {
         case .alter:
             alter(command)
         case .exit:
-            break;
+            exit();
         }
     }
 
@@ -33,7 +34,7 @@ class SQLRunner {
             case .database:
                 createDB(withName: command.commandTextContent![0])
             case .table:
-                break;
+                createTable(withName: command.commandTextContent![0], command: command)
             case .star:
                 break;
             }
@@ -55,6 +56,36 @@ class SQLRunner {
         }
     }
 
+    func createTable(withName name: String, command: Command) {
+        let newFilePath = Path(name)
+        if newFilePath.exists {
+            print("!Failed to create table \(name) because it already exists.")
+        } else {
+            do {
+                //(a1 int, a2 varchar(20))
+                let textContentLength = command.commandTextContent!.count
+                var rejoinedTextContent = ""
+                for index in 1...textContentLength-1 {
+                    rejoinedTextContent.append(command.commandTextContent![index] + " ")
+                }
+                let newTextContent = String(rejoinedTextContent.dropLast().dropLast().dropFirst()).replacingOccurrences(of: ",", with: "") // e.g. 'a3 float, a4 char(20)'
+                let newTextContentArray = newTextContent.components(separatedBy: .whitespaces)
+                var finalPlainText = ""
+                for index in 0...newTextContentArray.count-1 {
+                    if index % 2 != 0 { // odd number
+                        finalPlainText.append(newTextContentArray[index] + "\n")
+                    } else {
+                        finalPlainText.append(newTextContentArray[index] + " ")
+                    }
+                }
+                try newFilePath.write(finalPlainText)
+                print("Table \(name) created.")
+            } catch {
+                print("Couldn't write file for \(name)")
+            }
+        }
+    }
+
     /* DROP Functions */
 
     func drop(_ command: Command) {
@@ -63,7 +94,7 @@ class SQLRunner {
             case .database:
                 dropDB(withName: command.commandTextContent![0])
             case .table:
-                break;
+                dropTable(withName: command.commandTextContent![0])
             case .star:
                 break;
             }
@@ -85,21 +116,58 @@ class SQLRunner {
         }
     }
 
+    func dropTable(withName name: String) {
+        let filePath = Path(name)
+
+        if !filePath.exists {
+            print("!Failed to delete \(name) because it does not exist.")
+        } else {
+            do {
+                try filePath.delete()
+                print("Table \(name) deleted.")
+            } catch {
+                print("Couldn't delete file for \(name)")
+            }
+        }
+    }
+
     /* USE Functions */
 
     func use(_ command: Command) {
         let dbName = command.commandTextContent![0]
-        let currentPath = Path.current
-        currentPath.chdir {
-          // Path.current would be set to path during execution of this closure
+        let dbPath = initialPath + Path(dbName)
+        if dbPath.exists {
+            Path.current = dbPath
+            print("Using database \(dbName).")
+        } else {
+            print("!Failed to use \(dbName) because it does not exist.")
         }
     }
 
     func select(_ command: Command) {
-        // print("selecting")
+        let tablename = command.commandTextContent![0]
+        print("selecting \(tablename)")
+
+        let filePath = Path(tablename)
+
+        if !filePath.exists {
+            print("!Failed to select \(tablename) because it does not exist.")
+        } else {
+            do {
+                let fileString: String = try filePath.read()
+                let stringParts = fileString.components(separatedBy: .newlines)
+                print(stringParts[0] + " | " + stringParts[1])
+            } catch {
+                print("Couldn't read file \(tablename)")
+            }
+        }
     }
 
     func alter(_ command: Command) {
-        // print("altering")
+        print("------------------altering")
+    }
+
+    func exit() {
+        print("All done.")
     }
 }
