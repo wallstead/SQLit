@@ -156,7 +156,15 @@ class SQLRunner {
             do {
                 let fileString: String = try filePath.read()
                 let stringParts = fileString.components(separatedBy: .newlines)
-                print(stringParts[0] + " | " + stringParts[1])
+                var finalPrintString = ""
+                for index in 0...stringParts.count-2 {
+                    if index < stringParts.count-2 {
+                        finalPrintString.append(stringParts[index] + " | ")
+                    } else {
+                        finalPrintString.append(stringParts[index])
+                    }
+                }
+                print(finalPrintString)
             } catch {
                 print("Couldn't read file \(tablename)")
             }
@@ -164,7 +172,31 @@ class SQLRunner {
     }
 
     func alter(_ command: Command) {
-        print("------------------altering")
+
+        let tablename = command.commandTextContent![0]
+        let filePath = Path(tablename)
+
+        if !filePath.exists {
+            print("!Failed to alter \(tablename) because it does not exist.")
+        } else {
+            do {
+                let fileString: String = try filePath.read()
+                var stringParts: [String] = fileString.components(separatedBy: .newlines)
+                let newRow: String = "\(command.commandTextContent![2]) \(command.commandTextContent![3])"
+                stringParts[2] = newRow
+
+                var finalPlainText: String = ""
+
+                for index in 0...stringParts.count-1 {
+                    finalPlainText.append(stringParts[index] + "\n")
+                }
+
+                try filePath.write(finalPlainText)
+                print("Table \(tablename) altered.")
+            } catch {
+                print("Couldn't read file \(tablename)")
+            }
+        }
     }
 
     func exit() {
