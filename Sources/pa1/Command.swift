@@ -1,3 +1,5 @@
+
+/* This enum is to better organize base commands */
 enum BaseCommand: String {
     case create = "CREATE"
     case drop = "DROP"
@@ -7,17 +9,19 @@ enum BaseCommand: String {
     case exit = ".EXIT"
 }
 
+/* This enum is to better organize command modifiers */
 enum CommandModifier: String {
     case database = "DATABASE"
     case table = "TABLE"
     case star = "*"
 }
 
+/* This enum is to better organize the select command modifiers.. Will probably be changed in future versions */
 enum CommandModifierModifier: String {
     case from = "FROM"
 }
 
-
+/* The Command class is used to register command strings in a more programmatic way for running the SQL */
 class Command {
     let baseCommand: BaseCommand
     let commandModifier: CommandModifier?

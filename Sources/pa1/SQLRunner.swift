@@ -1,5 +1,6 @@
 import PathKit
 
+/* SQLRunner manages the actual running of each SQL command. */
 class SQLRunner {
 
     let initialPath: Path
@@ -171,6 +172,8 @@ class SQLRunner {
         }
     }
 
+    /* ALTER functions */
+
     func alter(_ command: Command) {
 
         let tablename = command.commandTextContent![0]
@@ -198,6 +201,8 @@ class SQLRunner {
             }
         }
     }
+
+    /* .EXIT function */
 
     func exit() {
         print("All done.")
