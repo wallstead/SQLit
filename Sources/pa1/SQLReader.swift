@@ -26,6 +26,8 @@ class SQLReader {
                         let lineSansSemiColon = line.replacingOccurrences(of: ";", with: "")
                         if let command = Command(commandString: lineSansSemiColon) {
                             commands.append(command)
+                        } else {
+                            print("ERROR Parsing Command String: '\(lineSansSemiColon)'")
                         }
                     }
                 }

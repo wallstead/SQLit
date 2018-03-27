@@ -21,6 +21,8 @@ class SQLRunner {
             select(command)
         case .alter:
             alter(command)
+        case .insert:
+            insert(command)
         case .exit:
             exit();
         }
@@ -36,7 +38,7 @@ class SQLRunner {
                 createDB(withName: command.commandTextContent![0])
             case .table:
                 createTable(withName: command.commandTextContent![0], command: command)
-            case .star:
+            case .star, .into:
                 break;
             }
         }
@@ -79,6 +81,7 @@ class SQLRunner {
                         finalPlainText.append(newTextContentArray[index] + " ")
                     }
                 }
+                finalPlainText.append("----------") // to seperate attribute info from the actual data
                 try newFilePath.write(finalPlainText)
                 print("Table \(name) created.")
             } catch {
@@ -96,7 +99,7 @@ class SQLRunner {
                 dropDB(withName: command.commandTextContent![0])
             case .table:
                 dropTable(withName: command.commandTextContent![0])
-            case .star:
+            case .star, .into:
                 break;
             }
         }
@@ -147,7 +150,6 @@ class SQLRunner {
 
     func select(_ command: Command) {
         let tablename = command.commandTextContent![0]
-        print("selecting \(tablename)")
 
         let filePath = Path(tablename)
 
@@ -156,16 +158,40 @@ class SQLRunner {
         } else {
             do {
                 let fileString: String = try filePath.read()
-                let stringParts = fileString.components(separatedBy: .newlines)
+                let attributeMeta = fileString.components(separatedBy: "----------")[0]
+
+                /* print the attribute metadata */
+                let stringParts = attributeMeta.components(separatedBy: .newlines)
                 var finalPrintString = ""
                 for index in 0...stringParts.count-2 {
                     if index < stringParts.count-2 {
-                        finalPrintString.append(stringParts[index] + " | ")
+                        finalPrintString.append(stringParts[index] + "|")
                     } else {
                         finalPrintString.append(stringParts[index])
                     }
                 }
                 print(finalPrintString)
+                /* print the rows */
+                if fileString.components(separatedBy: "----------")[1] != nil {
+                    let attributeData = fileString.components(separatedBy: "----------")[1]
+                    var rows = attributeData.components(separatedBy: .newlines)
+                    rows.removeFirst()
+                    for index in 0...rows.count-1 {
+                        let rowDataArray = rows[index].components(separatedBy: "|")
+                        var rowString: String = ""
+                        for dataIndex in 0...rowDataArray.count-1 {
+                            let cleanString = rowDataArray[dataIndex].deletingPrefix("\'").deletingSuffix("\'") // removing the quotes from strings
+                            if dataIndex < rowDataArray.count-1 {
+                                rowString.append(cleanString + "|")
+                            } else {
+                                rowString.append(cleanString)
+                            }
+                        }
+                        print(rowString)
+
+                    }
+                }
+
             } catch {
                 print("Couldn't read file \(tablename)")
             }
@@ -202,9 +228,92 @@ class SQLRunner {
         }
     }
 
+    /* INSERT functions */
+
+    func insert(_ command: Command) {
+        let tablename = command.commandTextContent![0]
+        let filePath = Path(tablename)
+
+        if !filePath.exists {
+            print("!Failed to insert into \(tablename) because it does not exist.")
+        } else {
+            do {
+                let fileString: String = try filePath.read()
+                var stringParts: [String] = fileString.components(separatedBy: "----------")
+                let attributeInfo = stringParts[0]
+                let rows = stringParts[1]
+
+                let cleanCommandTextArray = cleanCommandTextArr(command.commandTextContent!) // e.g. ["Product", "values(1,", "\'Gizmo\',", "19.99)"]
+                var commandTextIndex = 1 // start at the second done
+                var columnDataArray: [String] = []
+
+                while (commandTextIndex < cleanCommandTextArray.count) {
+                    let cleanColumn = cleanCommandTextArray[commandTextIndex].deletingPrefix("values(").deletingSuffix(")").deletingSuffix(",")
+                    columnDataArray.append(cleanColumn)
+                    commandTextIndex = commandTextIndex + 1
+                }
+
+                var newRow: String = ""
+                for index in 0...columnDataArray.count-1 {
+                    let columnData = columnDataArray[index]
+                    if index == columnDataArray.count-1 {
+                        newRow.append(columnData)
+                    } else {
+                        newRow.append(columnData + "|") // seperate columns by the pipe
+                    }
+                }
+
+                let newRows = rows + "\n" + newRow
+                stringParts[1] = "----------\n"
+                stringParts.append(newRows.deletingPrefix("\n"))
+
+                var finalPlainText: String = ""
+
+                for index in 0...stringParts.count-1 {
+                    finalPlainText.append(stringParts[index])
+                }
+
+                try filePath.write(finalPlainText)
+                print("1 new record inserted.")
+
+            } catch {
+                print("Couldn't read file \(tablename)")
+            }
+        }
+
+        // print(command.commandTextContent)
+    }
+
     /* .EXIT function */
 
     func exit() {
         print("All done.")
+    }
+
+    /* Misc other funcitons */
+
+    func cleanCommandTextArr(_ originalCommandTextArr: [String]) -> [String] {
+        var newCommandTextArr: [String] = []
+        var index = 0;
+        while ((index < originalCommandTextArr.count) && (originalCommandTextArr[index] != "--")) { // go until end of string array or until comments
+            if originalCommandTextArr[index] != "" { // ignore empty strings
+                newCommandTextArr.append(originalCommandTextArr[index])
+            }
+            index = index + 1
+        }
+
+        return newCommandTextArr
+    }
+}
+
+extension String {
+    func deletingPrefix(_ prefix: String) -> String {
+        guard self.hasPrefix(prefix) else { return self }
+        return String(self.dropFirst(prefix.count))
+    }
+
+    func deletingSuffix(_ suffix: String) -> String {
+        guard self.hasSuffix(suffix) else { return self }
+        return String(self.dropLast(suffix.count))
     }
 }

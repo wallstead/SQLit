@@ -6,6 +6,7 @@ enum BaseCommand: String {
     case use = "USE"
     case select = "SELECT"
     case alter = "ALTER"
+    case insert = "INSERT"
     case exit = ".EXIT"
 }
 
@@ -14,6 +15,7 @@ enum CommandModifier: String {
     case database = "DATABASE"
     case table = "TABLE"
     case star = "*"
+    case into = "INTO"
 }
 
 /* This enum is to better organize the select command modifiers.. Will probably be changed in future versions */
@@ -30,10 +32,11 @@ class Command {
 
     init?(commandString: String) {
         let separatedString = commandString.components(separatedBy: .whitespaces)
-        let baseString = separatedString[0]
+        let baseString = separatedString[0].uppercased()
 
         if separatedString.count > 1 { // the exit string will have only one command
-            let modifierString = separatedString[1]
+            let modifierString = separatedString[1].uppercased()
+
 
             if let baseCmd = BaseCommand(rawValue: baseString) {
                 baseCommand = baseCmd
@@ -63,8 +66,23 @@ class Command {
                         } else {
                             commandTextContent = nil
                         }
+                    } else if cmdModifier == .into {
+                        commandModifierModifier = nil
 
+                        let textContentStartIndex = 2
 
+                        let cmdStringArrayLength = separatedString.count
+                        var textContent: [String] = []
+
+                        if cmdStringArrayLength >= textContentStartIndex {
+                            for index in textContentStartIndex...cmdStringArrayLength-1 {
+                                textContent.append(separatedString[index]) // append parts of command string into a single textContent string
+                            }
+
+                            commandTextContent = textContent
+                        } else {
+                            commandTextContent = nil
+                        }
                     } else {
                         commandModifierModifier = nil
 
@@ -108,6 +126,7 @@ class Command {
                     }
                 }
             } else {
+                print("ERROR Creating Base Command With: '\(baseString)'")
                 return nil
             }
         } else {
