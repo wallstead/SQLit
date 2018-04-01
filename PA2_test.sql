@@ -15,10 +15,9 @@ insert into Product values(5,	'SuperGizmo', 	49.99); -- ** tabs not spaces
 select * from Product;
 
 --Modify data (20 points)
-update Product  -- update <Table>
-set name = 'Gizmo'  -- set <attribute> = <newname>
-where name = 'SuperGizmo'; -- where <attribute> = <newname>;
-
+update Product
+set name = 'Gizmo'
+where name = 'SuperGizmo'; 
 update Product
 set price = 14.99
 where name = 'Gizmo';
@@ -69,7 +68,7 @@ where pid != 2;
 -- 1 record deleted.
 -- pid int|name varchar(20)|price float
 -- 2|PowerGizmo|29.99
--- 3|SingleTouch|149.99
+-- 3|SingleTouch|149.99 -- got here
 -- name varchar(20)|price float
 -- SingleTouch|149.99
 -- All done.
