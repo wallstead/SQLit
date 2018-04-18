@@ -1,6 +1,0 @@
-pid int
-name varchar(20)
-price float
-----------
-2|'PowerGizmo'|29.99
-3|'SingleTouch'|149.99

@@ -34,7 +34,7 @@ class Command {
     let commandTextContent: [String]? // e.g. 'tbl_1 (a1 int);'
 
     init?(commandString: String) {
-        let separatedString = commandString.components(separatedBy: .whitespaces)
+        var separatedString = commandString.components(separatedBy: .whitespaces)
         let baseString = separatedString[0].uppercased()
         if separatedString.count > 1 { // the exit string will have only one command
             let modifierString = separatedString[1].uppercased()
@@ -92,6 +92,34 @@ class Command {
                             commandModifierModifier = nil
 
                             let textContentStartIndex = 2
+
+                            let cmdStringArrayLength = separatedString.count
+                            var textContent: [String] = []
+
+                            if cmdStringArrayLength >= textContentStartIndex {
+                                for index in textContentStartIndex...cmdStringArrayLength-1 {
+                                    textContent.append(separatedString[index]) // append parts of command string into a single textContent string
+                                }
+
+                                commandTextContent = textContent
+                            } else {
+                                commandTextContent = nil
+                            }
+                        } else if cmdModifier == .table {
+                            // print("yo")
+                            commandModifierModifier = nil
+
+                            // if separatedString looks like this: ["create", "table", "Employee(id", "int,", "name", "varchar(10))"]
+                            // change to this: ["create", "table", "Employee", "(id", "int,", "name", "varchar(10))"]
+
+
+                            let textContentStartIndex = 2
+
+                            let tableNameAndFirstCol = separatedString[textContentStartIndex].components(separatedBy: "(")
+                            if tableNameAndFirstCol.count > 1 { // if of the form ["Employee(id"] -> ["Employee", "(id"]
+                                separatedString[textContentStartIndex] = tableNameAndFirstCol[0]
+                                separatedString.insert("(" + tableNameAndFirstCol[1], at: textContentStartIndex+1)
+                            }
 
                             let cmdStringArrayLength = separatedString.count
                             var textContent: [String] = []

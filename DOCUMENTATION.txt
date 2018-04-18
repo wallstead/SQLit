@@ -1,0 +1,12 @@
+How To Run
+----------
+Last time it seemed that compiling on your Linux machine using Swift worked out.
+Compiling with any version of Swift equal to or higher than 4.0 should work again
+this time.
+So to get it built just make sure you have swift installed and enter the pa2 directory.
+Also make sure the PA2_test.sql is in the pa2 directory.
+Once you're in the directory run this command in terminal: "swift run pa2 PA2_test.sql"
+It should build and run and print the output to the console.
+
+If you have any issues feel free to contact me at willallstead@icloud.command
+Thanks!

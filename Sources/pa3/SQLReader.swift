@@ -9,7 +9,7 @@ class SQLReader {
         self.fileName = fileName
         self.commands = []
     }
-
+    /* read() in charge of reading in the file by the string included in the command line argument */
     func read() {
         let path = Path(fileName) // relative file location (assuming it's in the same directory)
 
@@ -28,7 +28,7 @@ class SQLReader {
                         }
                     } else if !line.hasPrefix("--") && line.count != 0 { /* This line is not a comment and not an empty line */
 
-                        let lineComponents = line.components(separatedBy: .whitespaces) // seperate the line by whitespaces
+                        let lineComponents = line.replacingOccurrences(of: ",", with: ", ").components(separatedBy: .whitespaces) // seperate the line by whitespaces
                         let cleanLineComponents = cleanCommandTextArr(lineComponents)
 
                         if line.range(of:";") == nil { // doesn't contain semicolon
@@ -44,6 +44,7 @@ class SQLReader {
                             /* Register the command */
                             let commandStringSansSemiColon = fullCommand.replacingOccurrences(of: "; ", with: "")
                             if let command = Command(commandString: commandStringSansSemiColon) {
+
                                 commands.append(command)
                             } else {
                                 print("ERROR Parsing Command String: '\(commandStringSansSemiColon)'")
@@ -53,14 +54,6 @@ class SQLReader {
                         }
                     }
                 }
-
-                /* on each line */
-                /* if line doesn't start with comment and it isn't empty
-                        if there isn't a ; on the line
-                                append the content (without comments) to the command string
-                        else (there is a ;)
-                                append the content (without comments) to the command string and append it to commands and clear the fullCommand
-                                */
             } catch {
                 print("Could not read from \(fileName)")
             }

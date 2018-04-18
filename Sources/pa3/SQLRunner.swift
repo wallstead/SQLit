@@ -1,12 +1,30 @@
 import PathKit
 
 /* SQLRunner manages the actual running of each SQL command. */
+
+struct Table {
+    let tableName: String
+    let tableVarName: String?
+}
+
+struct ColumnMeta {
+    let name: String // "id"
+    let type: String // "int"
+}
+
+struct Column {
+    let meta: ColumnMeta // like above
+    let value: String // "1"
+}
+
 class SQLRunner {
 
     let initialPath: Path
+    var tables: [Table]
 
     init(path: Path) {
         self.initialPath = path
+        self.tables = []
     }
 
     func run(command: Command) { // route to functions
@@ -33,7 +51,7 @@ class SQLRunner {
     }
 
     /* CREATE Functions */
-
+    /* create() function in charge of either creating a database or creating a table */
     func create(_ command: Command) {
 
         if let commandModifier = command.commandModifier {
@@ -48,6 +66,7 @@ class SQLRunner {
         }
     }
 
+    /* createDB() function for creating Databases (folders) with a name */
     func createDB(withName name: String) {
         let newDirPath = Path(name)
 
@@ -63,6 +82,7 @@ class SQLRunner {
         }
     }
 
+    /* createTable() function for creating Tables (files) with a name. */
     func createTable(withName name: String, command: Command) {
         let newFilePath = Path(name)
         if newFilePath.exists {
@@ -96,6 +116,7 @@ class SQLRunner {
 
     /* DROP Functions */
 
+    /* drop() function for deleting either databases or tables */
     func drop(_ command: Command) {
         if let commandModifier = command.commandModifier {
             switch commandModifier {
@@ -109,6 +130,7 @@ class SQLRunner {
         }
     }
 
+    /* dropDB() function for deleting databases (folders) */
     func dropDB(withName name: String) {
         let dirPath = Path(name)
 
@@ -124,6 +146,7 @@ class SQLRunner {
         }
     }
 
+    /* dropTable() function for deleting tables (files) */
     func dropTable(withName name: String) {
         let filePath = Path(name)
 
@@ -141,6 +164,7 @@ class SQLRunner {
 
     /* USE Functions */
 
+    /* use() function for using a database (switching folders to enter a database) */
     func use(_ command: Command) {
         let dbName = command.commandTextContent![0]
         let dbPath = initialPath + Path(dbName)
@@ -152,133 +176,205 @@ class SQLRunner {
         }
     }
 
+    /* SELECT Functions */
+
+    /* select() function for either wildcard or queried selections */
     func select(_ command: Command) {
-        var tablename = ""
+
+
+        var tablecount = 0
         if command.commandModifier == .multiselect {
-            tablename = command.commandTextContent![3]
+            tablecount = getTables(command: command, offset: 3)
         } else {
-            tablename = command.commandTextContent![0]
+            tablecount = getTables(command: command, offset: 0)
         }
 
-        let filePath = Path(tablename)
+        var printMeta: [String] = []
+        var printDataRows: [String] = []
 
-        if !filePath.exists {
-            print("!Failed to select \(tablename) because it does not exist.")
-        } else {
-            do {
-                let fileString: String = try filePath.read()
-                let attributeMeta = fileString.components(separatedBy: "----------")[0]
+        if tablecount == 1 {
 
-                if command.commandModifier == .multiselect {
-                    /* first get names of cols being selected */
-                    var selectedColumnNames: [String] = []
-                    var columnIndex = 0
-                    while command.commandTextContent![columnIndex] != "from" { // extract the column names we're looking for
-                        let columnNameClean = command.commandTextContent![columnIndex].deletingSuffix(",")
-                        selectedColumnNames.append(columnNameClean)
-                        columnIndex = columnIndex + 1
-                    }
+            let filePath = Path(tables[0].tableName)
 
+            if !filePath.exists {
+                print("!Failed to select \(tables[0].tableName) because it does not exist.")
+            } else {
+                do {
+                    let fileString: String = try filePath.read()
+                    let attributeMeta = fileString.components(separatedBy: "----------")[0]
 
-                    /* print the attribute metadata */
-                    var indexesToBePrinted: [Int] = []
-                    let stringParts = attributeMeta.components(separatedBy: .newlines)
-                    var finalPrintString = ""
-                    for index in 0...stringParts.count-2 {
-                        let attributeNameAndType = stringParts[index]
-                        let attributeName = attributeNameAndType.components(separatedBy: " ")[0]
-
-                        for selectedColumnName in selectedColumnNames {
-                            if attributeName == selectedColumnName { // check if attribute name = one of the ones needed to be printed
-                                indexesToBePrinted.append(index)
-                                if index < stringParts.count-2 {
-                                    finalPrintString.append(attributeNameAndType + "|")
-                                } else {
-                                    finalPrintString.append(attributeNameAndType)
-                                }
-                            }
+                    if command.commandModifier == .multiselect { // non-wildcard selections
+                        /* first get names of cols being selected */
+                        var selectedColumnNames: [String] = []
+                        var columnIndex = 0
+                        while command.commandTextContent![columnIndex] != "from" { // extract the column names we're looking for
+                            let columnNameClean = command.commandTextContent![columnIndex].deletingSuffix(",")
+                            selectedColumnNames.append(columnNameClean)
+                            columnIndex = columnIndex + 1
                         }
 
-                    }
-                    print(finalPrintString)
 
-                    let cleanCommandTextArray = cleanCommandTextArr(command.commandTextContent!)
-                    let findWhereInfo = findWhere(cleanCommandTextArray, fileString: fileString, setting: false)
-                    let printRows = findWhereInfo.0
+                        /* print the attribute metadata */
+                        var indexesToBePrinted: [Int] = []
+                        let stringParts = attributeMeta.components(separatedBy: .newlines)
+                        var finalPrintString = ""
+                        for index in 0...stringParts.count-2 {
+                            let attributeNameAndType = stringParts[index]
+                            let attributeName = attributeNameAndType.components(separatedBy: " ")[0]
 
-                    let fileData = fileString.components(separatedBy: "----------")
-                    if fileData.count > 1 {
-                        let attributeData = fileData[1]
-                        var rows = attributeData.components(separatedBy: .newlines)
-                        rows.removeFirst()
-                        for rowToPrint in printRows {
-                            /* printing the chosen values from the row at rows[rowToPrint] */
-
-                            let rowText = rows[rowToPrint]
-                            let rowParts = rowText.components(separatedBy: "|")
-                            /* create new array with only queried column data */
-                            var newRowParts: [String] = []
-                            for indexToBePrinted in indexesToBePrinted {
-                                newRowParts.append(rowParts[indexToBePrinted])
-                            }
-                            /* create the final print string */
-                            var rowString: String = ""
-                            for dataIndex in 0...newRowParts.count-1 {
-                                let cleanString = newRowParts[dataIndex].deletingPrefix("\'").deletingSuffix("\'") // removing the quotes from strings
-                                if dataIndex < newRowParts.count-1 {
-                                    rowString.append(cleanString + "|")
-                                } else {
-                                    rowString.append(cleanString)
+                            for selectedColumnName in selectedColumnNames {
+                                if attributeName == selectedColumnName { // check if attribute name = one of the ones needed to be printed
+                                    indexesToBePrinted.append(index)
+                                    if index < stringParts.count-2 {
+                                        finalPrintString.append(attributeNameAndType + "|")
+                                    } else {
+                                        finalPrintString.append(attributeNameAndType)
+                                    }
                                 }
                             }
 
-                            print(rowString)
                         }
+                        printMeta.append(finalPrintString)
+
+                        let cleanCommandTextArray = cleanCommandTextArr(command.commandTextContent!)
+                        let findWhereInfo = findWhere(cleanCommandTextArray, fileString: fileString, setting: false)
+                        let printRows = findWhereInfo.0
+
+                        let fileData = fileString.components(separatedBy: "----------")
+                        if fileData.count > 1 {
+                            let attributeData = fileData[1]
+                            var rows = attributeData.components(separatedBy: .newlines)
+                            rows.removeFirst()
+                            for rowToPrint in printRows {
+                                /* printing the chosen values from the row at rows[rowToPrint] */
+
+                                let rowText = rows[rowToPrint]
+                                let rowParts = rowText.components(separatedBy: "|")
+                                /* create new array with only queried column data */
+                                var newRowParts: [String] = []
+                                for indexToBePrinted in indexesToBePrinted {
+                                    newRowParts.append(rowParts[indexToBePrinted])
+                                }
+                                /* create the final print string */
+                                var rowString: String = ""
+                                for dataIndex in 0...newRowParts.count-1 {
+                                    let cleanString = newRowParts[dataIndex].deletingPrefix("\'").deletingSuffix("\'") // removing the quotes from strings
+                                    if dataIndex < newRowParts.count-1 {
+                                        rowString.append(cleanString + "|")
+                                    } else {
+                                        rowString.append(cleanString)
+                                    }
+                                }
+
+                                print(rowString)
+                            }
+                        }
+
+
+                    } else { // in the case of wildcard (*) selections
+
+
+                        /* print the attribute metadata */
+                        let stringParts = attributeMeta.components(separatedBy: .newlines)
+                        var finalPrintString = ""
+                        for index in 0...stringParts.count-2 {
+                            if index < stringParts.count-2 {
+                                finalPrintString.append(stringParts[index] + "|")
+                            } else {
+                                finalPrintString.append(stringParts[index])
+                            }
+                        }
+                        printMeta.append(finalPrintString)
+                        /* print the rows */
+                        let fileData = fileString.components(separatedBy: "----------")
+                        if fileData.count > 1 {
+                            let attributeData = fileString.components(separatedBy: "----------")[1]
+                            var rows = attributeData.components(separatedBy: .newlines)
+                            rows.removeFirst()
+                            for index in 0...rows.count-1 {
+                                let rowDataArray = rows[index].components(separatedBy: "|")
+                                var rowString: String = ""
+                                for dataIndex in 0...rowDataArray.count-1 {
+                                    let cleanString = rowDataArray[dataIndex].deletingPrefix("\'").deletingSuffix("\'") // removing the quotes from strings
+                                    if dataIndex < rowDataArray.count-1 {
+                                        rowString.append(cleanString + "|")
+                                    } else {
+                                        rowString.append(cleanString)
+                                    }
+                                }
+                                print(rowString)
+
+                            }
+                        }
+
+
                     }
 
 
+                } catch {
+                    print("Couldn't read file \(tables[0].tableName)")
+                }
+            }
+
+        } else { // multiple tables
+            print("multiple tables")
+
+            var meta: [[ColumnMeta]] = [] // will contain 1 array for each table with arrays of meta info in each array
+            var rows1: [[Column]] = []
+            var rows2: [[Column]] = []
+
+            for table in tables {
+                let filePath = Path(table.tableName)
+
+                if !filePath.exists {
+                    print("!Failed to select \(table.tableName) because it does not exist.")
                 } else {
-                    /* print the attribute metadata */
-                    let stringParts = attributeMeta.components(separatedBy: .newlines)
-                    var finalPrintString = ""
-                    for index in 0...stringParts.count-2 {
-                        if index < stringParts.count-2 {
-                            finalPrintString.append(stringParts[index] + "|")
-                        } else {
-                            finalPrintString.append(stringParts[index])
+                    do {
+                        let fileString: String = try filePath.read()
+                        /* get meta */
+                        var thisMeta = fileString.components(separatedBy: "----------")[0].components(separatedBy: "\n")
+                        thisMeta.removeLast()
+                        var thisTableMeta: [ColumnMeta] = []
+                        for meta in thisMeta {
+                            let singleMetaComponents = meta.components(separatedBy: " ")
+                            let thisColumnMeta = ColumnMeta(name: singleMetaComponents[0], type: singleMetaComponents[1])
+                            thisTableMeta.append(thisColumnMeta)
                         }
-                    }
-                    print(finalPrintString)
-                    /* print the rows */
-                    let fileData = fileString.components(separatedBy: "----------")
-                    if fileData.count > 1 {
-                        let attributeData = fileString.components(separatedBy: "----------")[1]
-                        var rows = attributeData.components(separatedBy: .newlines)
-                        rows.removeFirst()
-                        for index in 0...rows.count-1 {
-                            let rowDataArray = rows[index].components(separatedBy: "|")
-                            var rowString: String = ""
-                            for dataIndex in 0...rowDataArray.count-1 {
-                                let cleanString = rowDataArray[dataIndex].deletingPrefix("\'").deletingSuffix("\'") // removing the quotes from strings
-                                if dataIndex < rowDataArray.count-1 {
-                                    rowString.append(cleanString + "|")
-                                } else {
-                                    rowString.append(cleanString)
-                                }
-                            }
-                            print(rowString)
+                        meta.append(thisTableMeta)
 
-                        }
+                        /* get rows */
+                        var thisRows = fileString.components(separatedBy: "----------")[1].components(separatedBy: "\n")
+                        // thisRows.removeLast()
+                        print(thisRows)
+
+
+
+                        // print(fileString)
+
+                    } catch {
+                        print("Couldn't read file \(table.tableName)")
                     }
                 }
-            } catch {
-                print("Couldn't read file \(tablename)")
+            }
+
+            print(meta)
+        }
+
+        var finalPrintMeta = ""
+        for i in 0..<printMeta.count {
+            if i == printMeta.count - 1 {
+                finalPrintMeta.append(printMeta[i])
+            } else {
+                finalPrintMeta.append(printMeta[i] + "|")
             }
         }
+        print(finalPrintMeta)
+
     }
 
     /* ALTER functions */
 
+    /* alter() function for altering tables (files) to change the column names/datatypes */
     func alter(_ command: Command) {
 
         let tablename = command.commandTextContent![0]
@@ -309,6 +405,7 @@ class SQLRunner {
 
     /* INSERT functions */
 
+    /* insert() function for inserting rows into a table in the data section of the file */
     func insert(_ command: Command) {
         let tablename = command.commandTextContent![0]
         let filePath = Path(tablename)
@@ -364,6 +461,7 @@ class SQLRunner {
 
     /* UPDATE functions */
 
+    /* update() function for changing the data in the rows of a table file */
     func update(_ command: Command) {
         let tablename = command.commandTextContent![0]
         let filePath = Path(tablename)
@@ -435,6 +533,7 @@ class SQLRunner {
 
     /* DELETE functions */
 
+    /* delete() function for deleting rows from a table */
     func delete(_ command: Command) {
         let tablename = command.commandTextContent![1]
         let filePath = Path(tablename)
@@ -491,13 +590,18 @@ class SQLRunner {
 
     /* .EXIT function */
 
+    /* exit() function for stopping the program */
     func exit() {
         print("All done.")
     }
 
     /* WHERE helper */
 
-    func findWhere(_ cleanCommandTextArray: [String], fileString: String, setting: Bool) -> ([Int], Int, String) { // returns (row indexes that apply to where comparison, new attribute index, new value)
+    /* findWhere() function for helping when a command has a "where" keyword included.
+            - it searches to find the rows that apply to the where comparison and returns a tuple with pertinent information
+            - the tuple it returns is structured like: (row indexes that apply to where comparison, new attribute index, new value)
+     */
+    func findWhere(_ cleanCommandTextArray: [String], fileString: String, setting: Bool) -> ([Int], Int, String) {
         var stringParts: [String] = fileString.components(separatedBy: "----------")
         let attributeInfo = stringParts[0]
         let rows = stringParts[1]
@@ -508,7 +612,6 @@ class SQLRunner {
         while cleanCommandTextArray[whereIndex].uppercased() != "WHERE" {
             whereIndex = whereIndex + 1
         }
-
 
         let attributeNameIndex = whereIndex + 1
         let attributeName = cleanCommandTextArray[attributeNameIndex]
@@ -533,6 +636,13 @@ class SQLRunner {
 
         let attributeSelectorIndex = attributeComparatorIndex + 1
         let attributeSelector = cleanCommandTextArray[attributeSelectorIndex] // e.g. '29'
+
+        let dotIndex = attributeSelector.index(attributeSelector.startIndex, offsetBy: 1)
+
+        if attributeSelector[dotIndex] == "." { //has dot at second character, meaning it has its column name after the .
+            let colName = attributeSelector.components(separatedBy: ".")[1]
+            print(colName)
+        }
 
         let attributeNewValIndex = whereIndex - 1
         let attributeNewVal = cleanCommandTextArray[attributeNewValIndex] // e.g. '22'
@@ -581,10 +691,41 @@ class SQLRunner {
         return (affectedRowIndeces, 0, "")
     }
 
+    func findWhereMulti(_ commandTextArray: [String], fileString1: String, fileString2: String) -> ([Int], Int, String) {
+        return ([0], 0, "")
+    }
+
+    func getTables(command: Command, offset: Int) -> Int { // sets table array to contain tables we will use, and returns count of tables
+            // tablename = command.commandTextContent![offset]
+            // print(command.commandTextContent)
+            let indexOfWhere: Int = command.commandTextContent!.index(of: "where")!
+
+            if indexOfWhere > (1 + offset) { // multiple tables
+
+                for i in offset..<indexOfWhere {
+
+                    if i % 2 == 0 { // index will be at a table name, one away from table variable name
+                        let table = Table(tableName: command.commandTextContent![i], tableVarName: command.commandTextContent![i+1])
+                        tables.append(table)
+                    }
+                }
+
+            } else { // single table
+
+                let table = Table(tableName: command.commandTextContent![offset], tableVarName: nil)
+                tables.append(table)
+            }
+
+
+
+            return tables.count
+    }
+
 }
 
 /* Misc other funcitons */
 
+/* cleanCommandTextArr() function for removing comments from text arrays */
 func cleanCommandTextArr(_ originalCommandTextArr: [String]) -> [String] {
     var newCommandTextArr: [String] = []
     var index = 0;
@@ -599,11 +740,13 @@ func cleanCommandTextArr(_ originalCommandTextArr: [String]) -> [String] {
 }
 
 extension String {
+    /* deletingPrefix() function for deleting a prefix to a String */
     func deletingPrefix(_ prefix: String) -> String {
         guard self.hasPrefix(prefix) else { return self }
         return String(self.dropFirst(prefix.count))
     }
 
+    /* deletingSuffix() function for deleting a suffix to a String */
     func deletingSuffix(_ suffix: String) -> String {
         guard self.hasSuffix(suffix) else { return self }
         return String(self.dropLast(suffix.count))
