@@ -1,3 +1,8 @@
+/* 
+    Command.swift
+    Author: Willis Allstead
+    Date: 4/14/18
+*/
 
 /* This enum is to better organize base commands */
 enum BaseCommand: String {

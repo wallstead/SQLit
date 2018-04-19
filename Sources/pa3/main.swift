@@ -1,3 +1,9 @@
+/* 
+    main.swift
+    Author: Willis Allstead
+    Date: 4/14/18
+*/
+
 #if os(Linux)
 import Glibc
 #else

@@ -1,3 +1,9 @@
+/*
+    SQLReader.swift
+    Author: Willis Allstead
+    Date: 4/14/18
+*/
+
 import PathKit
 
 /* SQLReader manages the reading of an SQL file and converting the lines to commands that can be executed easily */

@@ -1,11 +1,10 @@
+/* 
+    SQLRunner.swift
+    Author: Willis Allstead
+    Date: 4/14/18
+*/
+
 import PathKit
-
-/* SQLRunner manages the actual running of each SQL command. */
-
-struct Table {
-    let tableName: String
-    let tableVarName: String?
-}
 
 struct ColumnMeta {
     let name: String // "id"
@@ -16,6 +15,14 @@ struct Column {
     let meta: ColumnMeta // like above
     let value: String // "1"
 }
+
+struct Table {
+    let tableName: String
+    let tableVarName: String?
+    var rows: [[Column]]
+}
+
+/* SQLRunner manages the actual running of each SQL command. */
 
 class SQLRunner {
 
@@ -189,6 +196,8 @@ class SQLRunner {
             tablecount = getTables(command: command, offset: 0)
         }
 
+
+
         var printMeta: [String] = []
         var printDataRows: [String] = []
 
@@ -317,59 +326,113 @@ class SQLRunner {
             }
 
         } else { // multiple tables
-            print("multiple tables")
 
-            var meta: [[ColumnMeta]] = [] // will contain 1 array for each table with arrays of meta info in each array
-            var rows1: [[Column]] = []
-            var rows2: [[Column]] = []
+            let cleanCommandTextArray = cleanCommandTextArr(command.commandTextContent!)
 
-            for table in tables {
-                let filePath = Path(table.tableName)
+            var whereIndex = 0
+            while (cleanCommandTextArray[whereIndex].uppercased() != "WHERE") && cleanCommandTextArray[whereIndex].uppercased() != "ON" {
+                whereIndex = whereIndex + 1
+            }
 
-                if !filePath.exists {
-                    print("!Failed to select \(table.tableName) because it does not exist.")
-                } else {
-                    do {
-                        let fileString: String = try filePath.read()
-                        /* get meta */
-                        var thisMeta = fileString.components(separatedBy: "----------")[0].components(separatedBy: "\n")
-                        thisMeta.removeLast()
-                        var thisTableMeta: [ColumnMeta] = []
-                        for meta in thisMeta {
-                            let singleMetaComponents = meta.components(separatedBy: " ")
-                            let thisColumnMeta = ColumnMeta(name: singleMetaComponents[0], type: singleMetaComponents[1])
-                            thisTableMeta.append(thisColumnMeta)
+
+
+            let attributeNameIndex = whereIndex + 1
+            let attributeName = cleanCommandTextArray[attributeNameIndex]
+            var dotIndex = attributeName.index(attributeName.startIndex, offsetBy: 1)
+            var leftColumnName = ""
+            var rightColumnName = ""
+
+            if attributeName[dotIndex] == "." { //has dot at second character, meaning it has its column name after the .
+                leftColumnName = attributeName.components(separatedBy: ".")[1]
+            }
+
+            let attributeComparatorIndex = attributeNameIndex + 1
+            let attributeComparator = cleanCommandTextArray[attributeComparatorIndex] // e.g. '='
+
+            let attributeSelectorIndex = attributeComparatorIndex + 1
+            let attributeSelector = cleanCommandTextArray[attributeSelectorIndex] // e.g. '29'
+
+            dotIndex = attributeSelector.index(attributeSelector.startIndex, offsetBy: 1)
+
+            if attributeSelector[dotIndex] == "." { //has dot at second character, meaning it has its column name after the .
+                rightColumnName = attributeSelector.components(separatedBy: ".")[1]
+            }
+
+            /* compare leftColumn to rightColumn with attributeComparator */
+            var joinType = "inner"
+            if cleanCommandTextArray[2] == "left" {
+                joinType = "left"
+            }
+
+            var printedMetaFlag = 0
+
+            for i in 0..<tables[0].rows.count { // loop through first table's rows
+
+                for j in 0..<tables[0].rows[i].count {// loop through row's colomns
+                    /* get value of column named leftColumnName */
+
+                    if tables[0].rows[i][j].meta.name == leftColumnName {
+                        let leftValue = tables[0].rows[i][j].value
+                        var matchedFlag = 0
+
+                        for k in 0..<tables[1].rows.count { // loop through second table's rows
+                            for l in 0..<tables[1].rows[k].count {// loop through row's colomns
+                                /* get value of column named rightColumnName */
+
+                                if tables[1].rows[k][l].meta.name == rightColumnName {
+                                    let rightValue = tables[1].rows[k][l].value
+
+
+                                    if leftValue == rightValue {
+
+                                        var finalMetaText = ""
+                                        var finalDataText = ""
+                                        let matchedLeftRow = tables[0].rows[i]
+                                        let matchedRightRow = tables[1].rows[k]
+
+
+
+                                        for column in matchedLeftRow {
+                                            let cleanPrintText = column.value.deletingPrefix("\'").deletingSuffix("\'")
+                                            finalMetaText.append(column.meta.name + " " + column.meta.type + "|")
+                                            let thisRowText = cleanPrintText + "|"
+                                            finalDataText.append(thisRowText)
+                                        }
+
+                                        for column in matchedRightRow {
+                                            let cleanPrintText = column.value.deletingPrefix("\'").deletingSuffix("\'")
+                                            finalMetaText.append(column.meta.name + " " + column.meta.type + "|")
+                                            let thisRowText = cleanPrintText + "|"
+                                            finalDataText.append(thisRowText)
+                                        }
+                                        if printedMetaFlag == 0 {
+                                            print(finalMetaText.deletingSuffix("|"))
+                                            printedMetaFlag = 1
+                                        }
+
+                                        matchedFlag = 1
+
+                                        print(finalDataText.deletingSuffix("|"))
+                                    } else {
+                                        if (k == tables[1].rows.count - 1) && (matchedFlag == 0) && (joinType == "left") {
+                                            // print("here bro")
+                                            let leftRow = tables[0].rows[i]
+                                            var finalDataText = ""
+                                            for column in leftRow {
+                                                let cleanPrintText = column.value.deletingPrefix("\'").deletingSuffix("\'")
+                                                let thisRowText = cleanPrintText + "|"
+                                                finalDataText.append(thisRowText)
+                                            }
+                                            print(finalDataText)
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        meta.append(thisTableMeta)
-
-                        /* get rows */
-                        var thisRows = fileString.components(separatedBy: "----------")[1].components(separatedBy: "\n")
-                        // thisRows.removeLast()
-                        print(thisRows)
-
-
-
-                        // print(fileString)
-
-                    } catch {
-                        print("Couldn't read file \(table.tableName)")
                     }
                 }
             }
-
-            print(meta)
         }
-
-        var finalPrintMeta = ""
-        for i in 0..<printMeta.count {
-            if i == printMeta.count - 1 {
-                finalPrintMeta.append(printMeta[i])
-            } else {
-                finalPrintMeta.append(printMeta[i] + "|")
-            }
-        }
-        print(finalPrintMeta)
-
     }
 
     /* ALTER functions */
@@ -691,36 +754,87 @@ class SQLRunner {
         return (affectedRowIndeces, 0, "")
     }
 
-    func findWhereMulti(_ commandTextArray: [String], fileString1: String, fileString2: String) -> ([Int], Int, String) {
-        return ([0], 0, "")
-    }
+
 
     func getTables(command: Command, offset: Int) -> Int { // sets table array to contain tables we will use, and returns count of tables
             // tablename = command.commandTextContent![offset]
             // print(command.commandTextContent)
-            let indexOfWhere: Int = command.commandTextContent!.index(of: "where")!
+            var indexOfWhere: Int = 0
+            if let whereindex = command.commandTextContent!.index(of: "where") {
+                indexOfWhere = whereindex
+            } else if let whereindex = command.commandTextContent!.index(of: "on") {
+                indexOfWhere = whereindex
+            }
 
             if indexOfWhere > (1 + offset) { // multiple tables
 
                 for i in offset..<indexOfWhere {
 
-                    if i % 2 == 0 { // index will be at a table name, one away from table variable name
-                        let table = Table(tableName: command.commandTextContent![i], tableVarName: command.commandTextContent![i+1])
-                        tables.append(table)
+                    let thisWord = command.commandTextContent![i].replacingOccurrences(of: ",", with: "")
+                    if (thisWord.count > 1) && // check if it is the single-letter variable name for table
+                       (thisWord != "left") &&
+                       (thisWord != "outer") &&
+                       (thisWord != "inner") &&
+                       (thisWord != "join") {
+                           tables.append(Table(tableName: thisWord, tableVarName: command.commandTextContent![i+1].replacingOccurrences(of: ",", with: "") , rows: []))
                     }
                 }
-
             } else { // single table
 
-                let table = Table(tableName: command.commandTextContent![offset], tableVarName: nil)
-                tables.append(table)
+                tables.append(Table(tableName: command.commandTextContent![offset].replacingOccurrences(of: ",", with: "") , tableVarName: nil, rows: []))
             }
 
 
+            populateTables()
 
             return tables.count
     }
 
+    /* populateTables() is used to actually go through each table file and populate the tables array of this class */
+
+    func populateTables() {
+
+        for i in 0..<tables.count {
+            let filePath = Path(tables[i].tableName)
+
+            if !filePath.exists {
+                print("!Failed to populate \(tables[i].tableName) because it does not exist.")
+            } else {
+                do {
+                    let fileString: String = try filePath.read()
+                    /* get meta */
+                    var thisMeta = fileString.components(separatedBy: "----------")[0].components(separatedBy: "\n")
+                    thisMeta.removeLast()
+                    var thisTableMeta: [ColumnMeta] = []
+                    for meta in thisMeta {
+                        let singleMetaComponents = meta.components(separatedBy: " ")
+                        let thisColumnMeta = ColumnMeta(name: singleMetaComponents[0], type: singleMetaComponents[1])
+                        thisTableMeta.append(thisColumnMeta)
+                    }
+                    // meta.append(thisTableMeta)
+
+                    /* get rows */
+                    var rowsTextArray = fileString.components(separatedBy: "----------")[1].components(separatedBy: "\n")
+                    rowsTextArray.removeFirst()
+
+                    var rows: [[Column]] = []
+                    for rowText in rowsTextArray {
+                        let rowData = rowText.components(separatedBy: "|")
+
+                        var row: [Column] = []
+                        for i in 0..<rowData.count {
+                            row.append(Column(meta: thisTableMeta[i], value: rowData[i]))
+                        }
+
+                        rows.append(row)
+                    }
+                    tables[i].rows = rows
+                } catch {
+                    print("Couldn't read file \(tables[i].tableName)")
+                }
+            }
+        }
+    }
 }
 
 /* Misc other funcitons */

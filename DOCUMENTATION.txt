@@ -1,12 +1,34 @@
-How To Run
-----------
-Last time it seemed that compiling on your Linux machine using Swift worked out.
-Compiling with any version of Swift equal to or higher than 4.0 should work again
-this time.
-So to get it built just make sure you have swift installed and enter the pa2 directory.
-Also make sure the PA2_test.sql is in the pa2 directory.
-Once you're in the directory run this command in terminal: "swift run pa2 PA2_test.sql"
+Project 3 By: Willis Allstead
+=============================
+
+How To Compile/Run
+------------------
+To get it built just make sure you have swift v4+ installed and cd into the pa3 directory.
+Also make sure the PA3_test.sql is in the pa3 directory.
+Once you're in the directory run this command in terminal: "swift run pa3 PA3_test.sql"
 It should build and run and print the output to the console.
 
-If you have any issues feel free to contact me at willallstead@icloud.command
-Thanks!
+If you have any issues let me know, thanks!
+
+Note
+----
+I honestly ran out of time to implement the stdin so you still can't do "swift run pa3 < PA3_test.sql",
+this will be implemented by pa4.
+
+How Tuples are Handled
+---------------------
+Tuples are stored in a table under the table metadata in the table files.
+Tuple insertion is done by editing that file, inserting at whatever tuple index is required.
+Tuple deletion is done similarly, but then collapsing the file to remove empty whitespaces.
+Tuple modification is done similarly as well.
+Tuple queries use the metadata section of the table file to find the index of the columns to be queried,
+and those respective cols are changed in their respective rows.
+
+How Different Joins are Implemented
+-----------------------------------
+Both of the first joins, which are inner joins, are implemented the same way.
+Essentially, the data for both tables is stored in structs to make them easy to iterate through.
+For inner joins, for every row in the first table that has the specified column name
+that matches the second table's specified column name, the matching rows are combined printed.
+For the left outer join, a similar technique is used, but if there was no match between the left table's
+data and the right table's data, the left is still printed.

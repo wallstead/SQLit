@@ -20,14 +20,14 @@ from Employee E, Sales S
 where E.id = S.employeeID;
 
 -- This is the same as above but with a different syntax (20 points)
--- select *
--- from Employee E inner join Sales S
--- on E.id = S.employeeID;
+select *
+from Employee E inner join Sales S
+on E.id = S.employeeID;
 
 -- The following will include Gill (30 points)
--- select *
--- from Employee E left outer join Sales S
--- on E.id = S.employeeID;
+select *
+from Employee E left outer join Sales S
+on E.id = S.employeeID;
 
 .exit
 
