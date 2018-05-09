@@ -1,4 +1,4 @@
-/* 
+/*
     Command.swift
     Author: Willis Allstead
     Date: 4/14/18
@@ -14,6 +14,8 @@ enum BaseCommand: String {
     case insert = "INSERT"
     case update = "UPDATE"
     case delete = "DELETE"
+    case begin = "BEGIN"
+    case commit = "COMMIT"
     case exit = ".EXIT"
 }
 
@@ -39,6 +41,7 @@ class Command {
     let commandTextContent: [String]? // e.g. 'tbl_1 (a1 int);'
 
     init?(commandString: String) {
+        
         var separatedString = commandString.components(separatedBy: .whitespaces)
         let baseString = separatedString[0].uppercased()
         if separatedString.count > 1 { // the exit string will have only one command

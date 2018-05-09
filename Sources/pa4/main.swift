@@ -10,6 +10,8 @@ import Glibc
 import Darwin.C
 #endif
 
+// ACID: Atomic, Consistent, Isolation, Durable
+
 import PathKit
 
 let startPath = Path.current
@@ -33,11 +35,11 @@ while let inLine = readLine() { // get the line from stdin
             for lineComponent in cleanLineComponents {
                 command.append(lineComponent + " ")
             }
-
             /* Register and run the command */
             let commandStringSansSemiColon = command.replacingOccurrences(of: "; ", with: "")
-            if let command = Command(commandString: commandStringSansSemiColon) {
 
+            if let command = Command(commandString: commandStringSansSemiColon) {
+                
                 sqlRunner.run(command: command)
             } else {
                 print("ERROR Parsing Command String: '\(commandStringSansSemiColon)'")

@@ -1,19 +1,15 @@
-Project 3 By: Willis Allstead
+Project 4 By: Willis Allstead
 =============================
 
 How To Compile/Run
 ------------------
-To get it built just make sure you have swift v4+ installed and cd into the pa3 directory.
-Also make sure the PA3_test.sql is in the pa3 directory.
-Once you're in the directory run this command in terminal: "swift run pa3 PA3_test.sql"
-It should build and run and print the output to the console.
+To get it built just make sure you have swift v4+ installed and cd into the pa4 directory.
+Also make sure the PA4_test.sql is in the pa4 directory.
+Once you're in the directory run this command in terminal: "swift run pa4"
+It should build and run and it will accept either std input with the < operator or take commands line by line.
 
 If you have any issues let me know, thanks!
 
-Note
-----
-I honestly ran out of time to implement the stdin so you still can't do "swift run pa3 < PA3_test.sql",
-this will be implemented by pa4.
 
 How Tuples are Handled
 ---------------------
@@ -32,3 +28,11 @@ For inner joins, for every row in the first table that has the specified column 
 that matches the second table's specified column name, the matching rows are combined printed.
 For the left outer join, a similar technique is used, but if there was no match between the left table's
 data and the right table's data, the left is still printed.
+
+How Atomic Transactions are Implemented
+---------------------------------------
+Atomic transactions are implemented using the locking method. Essentially, when a transaction is started,
+whatever table is being altered is copied and the copy is given the name <table-name>_LOCKED. There is a function
+that checks whether a table is locked by looking for the table with this suffix, and this function is called before
+any mutating changes are committed to a file. This way, if a file is locked by one process, it cannot be changed by another.
+Also, this permits queries to the table while another process is altering it.

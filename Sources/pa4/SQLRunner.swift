@@ -1,4 +1,4 @@
-/* 
+/*
     SQLRunner.swift
     Author: Willis Allstead
     Date: 4/14/18
@@ -28,6 +28,9 @@ class SQLRunner {
 
     let initialPath: Path
     var tables: [Table]
+    var inTransaction = false
+    var abortTransaction = false
+    var tableToCommit = ""
 
     init(path: Path) {
         self.initialPath = path
@@ -52,6 +55,10 @@ class SQLRunner {
             update(command)
         case .delete:
             delete(command)
+        case .begin:
+            beginTransaction(command)
+        case .commit:
+            commitTransaction()
         case .exit:
             exit();
         }
@@ -188,15 +195,12 @@ class SQLRunner {
     /* select() function for either wildcard or queried selections */
     func select(_ command: Command) {
 
-
         var tablecount = 0
         if command.commandModifier == .multiselect {
             tablecount = getTables(command: command, offset: 3)
         } else {
             tablecount = getTables(command: command, offset: 0)
         }
-
-
 
         var printMeta: [String] = []
         var printDataRows: [String] = []
@@ -294,6 +298,7 @@ class SQLRunner {
                             }
                         }
                         printMeta.append(finalPrintString)
+                        print(printMeta[0])
                         /* print the rows */
                         let fileData = fileString.components(separatedBy: "----------")
                         if fileData.count > 1 {
@@ -526,71 +531,84 @@ class SQLRunner {
 
     /* update() function for changing the data in the rows of a table file */
     func update(_ command: Command) {
-        let tablename = command.commandTextContent![0]
-        let filePath = Path(tablename)
+        var tablename = command.commandTextContent![0]
+        var isAlreadyLocked = false
 
-        if !filePath.exists {
-            print("!Failed to update \(tablename) because it does not exist.")
-        } else {
-            do {
-                let fileString: String = try filePath.read()
+        if inTransaction == true {
+            /* create lock file if it doesn't exist */
+            isAlreadyLocked = !createLockFile(tableName: tablename)  // returns false if the table is already locked or there is an error
+            tablename = tablename.capitalized+"_LOCKED"
+            tableToCommit = tablename
+        }
 
+        if isAlreadyLocked == false {
+            let filePath = Path(tablename)
 
-                let cleanCommandTextArray = cleanCommandTextArr(command.commandTextContent!)
-                let findWhereInfo = findWhere(cleanCommandTextArray, fileString: fileString, setting: true)
-                let affectedRows = findWhereInfo.0
-                let attributeNewIndex = findWhereInfo.1
-                let attributeNewValue = findWhereInfo.2
-
-                var stringParts: [String] = fileString.components(separatedBy: "----------")
-                let rows = stringParts[1]
-                var rowsArray: [String] = rows.components(separatedBy: "\n")
-                rowsArray.removeFirst()
-
-                for affectedRow in affectedRows {
+            if !filePath.exists {
+                print("!Failed to update \(tablename) because it does not exist.")
+            } else {
+                do {
+                    let fileString: String = try filePath.read()
 
 
-                    var rowDataArray = rowsArray[affectedRow].components(separatedBy: "|")
-                    rowDataArray[attributeNewIndex] = attributeNewValue
+                    let cleanCommandTextArray = cleanCommandTextArr(command.commandTextContent!)
+                    let findWhereInfo = findWhere(cleanCommandTextArray, fileString: fileString, setting: true)
+                    let affectedRows = findWhereInfo.0
+                    let attributeNewIndex = findWhereInfo.1
+                    let attributeNewValue = findWhereInfo.2
 
-                    var newRow: String = ""
-                    for index in 0...rowDataArray.count-1 {
-                        let rowData = rowDataArray[index]
-                        if index == rowDataArray.count-1 {
-                            newRow.append(rowData)
-                        } else {
-                            newRow.append(rowData + "|") // seperate columns by the pipe
+                    var stringParts: [String] = fileString.components(separatedBy: "----------")
+                    let rows = stringParts[1]
+                    var rowsArray: [String] = rows.components(separatedBy: "\n")
+                    rowsArray.removeFirst()
+
+                    for affectedRow in affectedRows {
+
+
+                        var rowDataArray = rowsArray[affectedRow].components(separatedBy: "|")
+                        rowDataArray[attributeNewIndex] = attributeNewValue
+
+                        var newRow: String = ""
+                        for index in 0...rowDataArray.count-1 {
+                            let rowData = rowDataArray[index]
+                            if index == rowDataArray.count-1 {
+                                newRow.append(rowData)
+                            } else {
+                                newRow.append(rowData + "|") // seperate columns by the pipe
+                            }
                         }
+
+                        rowsArray[affectedRow] = newRow
+                        var rowsFinalText = ""
+                        for index in 0...rowsArray.count-1 {
+                            if index == rowsArray.count-1 {
+                                rowsFinalText.append(rowsArray[index])
+                            } else {
+                                rowsFinalText.append(rowsArray[index] + "\n")
+                            }
+                        }
+
+                        let finalFileString = stringParts[0] + "----------" + "\n" + rowsFinalText
+                        _ = finalFileString.deletingSuffix("\n")
+
+                        try filePath.write(finalFileString)
                     }
 
-                    rowsArray[affectedRow] = newRow
-                    var rowsFinalText = ""
-                    for index in 0...rowsArray.count-1 {
-                        if index == rowsArray.count-1 {
-                            rowsFinalText.append(rowsArray[index])
+                    if affectedRows.count > 0 {
+                        if affectedRows.count == 1 {
+                            print("1 record modified.")
                         } else {
-                            rowsFinalText.append(rowsArray[index] + "\n")
+                            print("\(affectedRows.count) records modified.")
                         }
-                    }
-
-                    let finalFileString = stringParts[0] + "----------" + "\n" + rowsFinalText
-                    _ = finalFileString.deletingSuffix("\n")
-
-                    try filePath.write(finalFileString)
-                }
-
-                if affectedRows.count > 0 {
-                    if affectedRows.count == 1 {
-                        print("1 record modified.")
                     } else {
-                        print("\(affectedRows.count) records modified.")
+                        print("0 records modified.")
                     }
-                } else {
-                    print("0 records modified.")
+                } catch {
+                    print("Couldn't read table \(tablename)")
                 }
-            } catch {
-                print("Couldn't read table \(tablename)")
             }
+        } else {
+            abortTransaction = true
         }
     }
 
@@ -650,6 +668,25 @@ class SQLRunner {
             }
         }
     }
+
+    /* Transaction functions */
+
+    /* beginTransaction() function for starting a transaction */
+    func beginTransaction(_ command: Command) {
+        inTransaction = true
+        print("Transaction starts.")
+    }
+
+    /* commitTransaction() function for ending a transaction */
+    func commitTransaction() {
+        if abortTransaction == true {
+            print("Transaction abort.")
+        } else {
+            commitLockFile(tableName: tableToCommit)
+        }
+    }
+
+
 
     /* .EXIT function */
 
@@ -757,8 +794,7 @@ class SQLRunner {
 
 
     func getTables(command: Command, offset: Int) -> Int { // sets table array to contain tables we will use, and returns count of tables
-            // tablename = command.commandTextContent![offset]
-            // print(command.commandTextContent)
+
             var indexOfWhere: Int = 0
             if let whereindex = command.commandTextContent!.index(of: "where") {
                 indexOfWhere = whereindex
@@ -767,9 +803,7 @@ class SQLRunner {
             }
 
             if indexOfWhere > (1 + offset) { // multiple tables
-
                 for i in offset..<indexOfWhere {
-
                     let thisWord = command.commandTextContent![i].replacingOccurrences(of: ",", with: "")
                     if (thisWord.count > 1) && // check if it is the single-letter variable name for table
                        (thisWord != "left") &&
@@ -780,10 +814,17 @@ class SQLRunner {
                     }
                 }
             } else { // single table
-
-                tables.append(Table(tableName: command.commandTextContent![offset].replacingOccurrences(of: ",", with: "") , tableVarName: nil, rows: []))
+                let newTableName = command.commandTextContent![offset].replacingOccurrences(of: ",", with: "")
+                var copyFlag = false
+                for table in tables {
+                    if table.tableName == newTableName {
+                        copyFlag = true
+                    }
+                }
+                if copyFlag == false {
+                    tables.append(Table(tableName: newTableName, tableVarName: nil, rows: []))
+                }
             }
-
 
             populateTables()
 
@@ -835,6 +876,74 @@ class SQLRunner {
             }
         }
     }
+
+
+    /* createLockFile() function is used to create a lock on a table */
+    func createLockFile(tableName: String) -> Bool { // returns false if the table is already locked or there is an error
+        let filePath = Path(tableName)
+
+        if !filePath.exists {
+            print("!Failed to begin transaction with \(tableName) because it does not exist.")
+            return false
+        } else {
+            do {
+                let fileString: String = try filePath.read()
+
+                let newFilePath = Path(tableName.capitalized+"_LOCKED")
+                if !newFilePath.exists {
+                    do {
+                        try newFilePath.write(fileString)
+                        return true
+                    } catch {
+                        print("Couldn't create locked file for \(tableName)")
+                        return false
+                    }
+                } else {
+                    print("Error: Table \(tableName.capitalized) is locked!")
+                    return false
+                }
+            } catch {
+                print("Couldn't read table \(tableName) when attempting to begin transaction.")
+                return false
+            }
+        }
+    }
+
+    /* commitLockFile() function is used to commit the changes to a table */
+    func commitLockFile(tableName: String) {
+        let filePath = Path(tableName)
+
+        if !filePath.exists {
+            print("!Failed to commit transaction for table \(tableName) because \(tableName+"_LOCKED") doesn't exist.")
+
+        } else {
+            do {
+                let fileString: String = try filePath.read()
+
+                let originalTablePath = Path(tableName.deletingSuffix("_LOCKED"))
+                if originalTablePath.exists {
+                    do {
+                        try originalTablePath.write(fileString)
+
+                        /* reset transaction variables */
+                        inTransaction = false
+                        abortTransaction = false
+                        tableToCommit = ""
+
+                        /* delete locked file */
+                        try filePath.delete()
+                    } catch {
+                        print("Couldn't commit changes for \(tableName)")
+                    }
+                } else {
+                    print("Error: Table \(tableName.deletingSuffix("_LOCKED")) does not exist.")
+                }
+            } catch {
+                print("Couldn't read table \(tableName) when attempting to commit transaction.")
+
+            }
+        }
+    }
 }
 
 /* Misc other funcitons */
@@ -843,7 +952,8 @@ class SQLRunner {
 func cleanCommandTextArr(_ originalCommandTextArr: [String]) -> [String] {
     var newCommandTextArr: [String] = []
     var index = 0;
-    while ((index < originalCommandTextArr.count) && (originalCommandTextArr[index] != "--")) { // go until end of string array or until comments
+
+    while ((index < originalCommandTextArr.count) && (originalCommandTextArr[index] != "--") && (originalCommandTextArr[index].range(of:"--") == nil)) { // go until end of string array or until comments
         if originalCommandTextArr[index] != "" { // ignore empty strings
             newCommandTextArr.append(originalCommandTextArr[index])
         }
